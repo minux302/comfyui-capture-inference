@@ -8,14 +8,13 @@ from client import Client
 
 
 workflow_list = os.listdir("workflows")
-status_manager = StatusManager()
 
 
-def run_capture():
+def run_capture(status_manager: StatusManager):
     status_manager.run_capture()
 
 
-def stop_capture():
+def stop_capture(status_manager: StatusManager):
     status_manager.stop_capture()
 
 
@@ -33,6 +32,7 @@ def run_generate(
     workflow_manager: WorkflowManager,
     generate_settings: GenerateSettings,
     client: Client,
+    status_manager: StatusManager,
 ):
     capture_img = status_manager.capture_img
     is_captureing = status_manager.is_capturing
@@ -61,6 +61,7 @@ def ui(
     workflow_manager: WorkflowManager,
     generate_settings: GenerateSettings,
     client: Client,
+    status_manager: StatusManager,
 ):
     with gr.Blocks() as ui:
         capture_button = gr.Button("capture")
@@ -79,8 +80,8 @@ def ui(
             value=config["init_workflow"],
         )
         image_output = gr.Image()
-        capture_button.click(fn=run_capture, inputs=[], outputs=[])
-        stop_button.click(fn=stop_capture, inputs=[], outputs=[])
+        capture_button.click(fn=lambda: run_capture(status_manager), inputs=[], outputs=[])
+        stop_button.click(fn=lambda: stop_capture(status_manager), inputs=[], outputs=[])
         prompt.change(
             fn=lambda x: setattr(generate_settings, "prompt", x),
             inputs=[prompt],
@@ -107,7 +108,9 @@ def ui(
             outputs=[control_strength],
         )
         ui.load(
-            fn=lambda: run_generate(workflow_manager, generate_settings, client),
+            fn=lambda: run_generate(
+                workflow_manager, generate_settings, client, status_manager
+            ),
             inputs=[],
             outputs=image_output,
             every=0.01,
