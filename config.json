@@ -1,0 +1,5 @@
+{
+    "init_workflow": "sd15_img2img.json",
+    "ckpt_name": "sdhk_v40.safetensors",
+    "seed": -1
+}
