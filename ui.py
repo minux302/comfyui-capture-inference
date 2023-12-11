@@ -9,6 +9,7 @@ from status_manager import StatusManager
 from client import Client
 
 
+status_manager = StatusManager()
 workflow_list = os.listdir("workflows")
 
 
@@ -26,16 +27,8 @@ def run_generate(
     workflow_manager: WorkflowManager,
     generate_settings: GenerateSettings,
     client: Client,
-    status_manager: StatusManager,
-    is_capturing,
-    bbox,
 ):
     capture_img = status_manager.capture_img
-    if is_capturing.value == 1:
-        status_manager.is_capturing = True
-        status_manager.bbox = tuple(bbox)
-    print(type(capture_img))
-
     if capture_img is None or not status_manager.is_capturing:
         result_img = status_manager.result_img
         if result_img is not None:
@@ -60,21 +53,21 @@ def ui(
     workflow_manager: WorkflowManager,
     generate_settings: GenerateSettings,
     client: Client,
-    status_manager: StatusManager,
     queue: Queue,
     is_capturing,
     bbox,
 ):
     def run_capture():
-        queue.put("run_capture")
+        queue.put("set_bbox")
         message = queue.get()
-        if message == "set_bbox":
-            status_manager.is_capturing = True
-            status_manager.bbox = tuple(bbox)
-            status_manager.run_capture()
+        assert message == "done"
+        status_manager.is_capturing = True
+        status_manager.bbox = tuple(bbox)
+        status_manager.run_capture()
 
     def stop_capture():
-        queue.put("stop_capture")
+        status_manager.stop_capture()
+        status_manager.is_capturing = False
 
     with gr.Blocks() as ui:
         capture_button = gr.Button("capture")
@@ -124,10 +117,7 @@ def ui(
             fn=lambda: run_generate(
                 workflow_manager,
                 generate_settings,
-                client,
-                status_manager,
-                is_capturing,
-                bbox
+                client
             ),
             inputs=[],
             outputs=image_output,
