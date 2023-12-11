@@ -1,21 +1,16 @@
 import os
+from typing import Literal
 import functools
 import gradio as gr
+from multiprocessing import Queue
 
 from workflow_manager import GenerateSettings, WorkflowManager
 from status_manager import StatusManager
 from client import Client
 
 
+status_manager = StatusManager()
 workflow_list = os.listdir("workflows")
-
-
-def run_capture(status_manager: StatusManager):
-    status_manager.run_capture()
-
-
-def stop_capture(status_manager: StatusManager):
-    status_manager.stop_capture()
 
 
 def load_workflow(workflow_name: str, workflow_manager: WorkflowManager):
@@ -32,12 +27,9 @@ def run_generate(
     workflow_manager: WorkflowManager,
     generate_settings: GenerateSettings,
     client: Client,
-    status_manager: StatusManager,
 ):
     capture_img = status_manager.capture_img
-    is_captureing = status_manager.is_capturing
-
-    if capture_img is None or not is_captureing:
+    if capture_img is None or not status_manager.is_capturing:
         result_img = status_manager.result_img
         if result_img is not None:
             img_h, img_w, _ = result_img.shape
@@ -61,8 +53,22 @@ def ui(
     workflow_manager: WorkflowManager,
     generate_settings: GenerateSettings,
     client: Client,
-    status_manager: StatusManager,
+    queue: Queue,
+    is_capturing,
+    bbox,
 ):
+    def run_capture():
+        queue.put("set_bbox")
+        message = queue.get()
+        assert message == "done"
+        status_manager.is_capturing = True
+        status_manager.bbox = tuple(bbox)
+        status_manager.run_capture()
+
+    def stop_capture():
+        status_manager.stop_capture()
+        status_manager.is_capturing = False
+
     with gr.Blocks() as ui:
         capture_button = gr.Button("capture")
         stop_button = gr.Button("stop")
@@ -80,8 +86,8 @@ def ui(
             value=config["init_workflow"],
         )
         image_output = gr.Image()
-        capture_button.click(fn=lambda: run_capture(status_manager), inputs=[], outputs=[])
-        stop_button.click(fn=lambda: stop_capture(status_manager), inputs=[], outputs=[])
+        capture_button.click(fn=run_capture, inputs=[], outputs=[])
+        stop_button.click(fn=stop_capture, inputs=[], outputs=[])
         prompt.change(
             fn=lambda x: setattr(generate_settings, "prompt", x),
             inputs=[prompt],
@@ -109,10 +115,13 @@ def ui(
         )
         ui.load(
             fn=lambda: run_generate(
-                workflow_manager, generate_settings, client, status_manager
+                workflow_manager,
+                generate_settings,
+                client
             ),
             inputs=[],
             outputs=image_output,
             every=0.01,
         )
-    return ui
+    ui.queue()
+    ui.launch()
