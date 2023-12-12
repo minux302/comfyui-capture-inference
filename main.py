@@ -7,18 +7,6 @@ from client import Client
 from ui import ui
 from workflow_manager import GenerateSettings, WorkflowManager
 
-
-def set_bbox(queue, is_captureing, bbox):
-    bbox_manager.run()
-    is_captureing.value = 1
-    bbox_obj = bbox_manager.bbox
-    bbox[0] = bbox_obj.x1
-    bbox[1] = bbox_obj.y1
-    bbox[2] = bbox_obj.x2
-    bbox[3] = bbox_obj.y2
-    queue.put("done")
-
-
 if __name__ == "__main__":
     with open("config.json", "r") as f:
         config = json.load(f)
@@ -26,12 +14,12 @@ if __name__ == "__main__":
     generate_settings = GenerateSettings(**config)
     client = Client()
     bbox_manager = CaptureBBoxManager()  # must be main process, since uses tkinter
-    
-    # status shared between processes
-    queue = Queue()
-    is_capturing = Value('i', 0)
-    bbox = Array('i', [0, 0, 0, 0])
-    
+
+    # shared status between BboxManager(tkinter) and gradio
+    shared_queue = Queue()
+    shared_is_capturing = Value("i", 0)
+    shared_bbox = Array("i", [0, 0, 0, 0])
+
     ui_process = multiprocessing.Process(
         target=ui,
         args=(
@@ -39,14 +27,14 @@ if __name__ == "__main__":
             workflow_manager,
             generate_settings,
             client,
-            queue,
-            is_capturing,
-            bbox
+            shared_queue,
+            shared_is_capturing,
+            shared_bbox,
         ),
     )
     ui_process.start()
-    
+
     while True:
-        message = queue.get()
+        message = shared_queue.get()
         if message == "set_bbox":
-            set_bbox(queue, is_capturing, bbox)
+            bbox_manager.set_bbox(shared_queue, shared_is_capturing, shared_bbox)

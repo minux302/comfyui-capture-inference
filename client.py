@@ -1,19 +1,22 @@
 from __future__ import annotations
-import numpy as np
-import time
-from urllib import request
-import io
+
 import asyncio
+import io
 import json
 import struct
-from eventloop import AsyncApp
+import time
 import uuid
-from typing import Optional, NamedTuple
 from enum import Enum
+from typing import NamedTuple, Optional
+from urllib import request
+
+import numpy as np
 from PIL import Image
-from util import client_logger as log
 from websockets import client as websockets_client
 from websockets import exceptions as websockets_exceptions
+
+from eventloop import AsyncApp
+from util import client_logger as log
 
 
 class ClientEvent(Enum):
@@ -86,17 +89,12 @@ class Client:
             except websockets_exceptions.ConnectionClosedError as e:
                 log.warning(f"Websocket connection closed: {str(e)}")
             except OSError as e:
-                msg = (
-                    "Could not connect to websocket server "
-                    + f"at {url}: {str(e)}"
-                )
+                msg = "Could not connect to websocket server " + f"at {url}: {str(e)}"
             except asyncio.CancelledError:
                 await websocket.close()
                 break
             except Exception as e:
-                log.exception(
-                    f"Unhandled exception in websocket listener, {e}"
-                )
+                log.exception(f"Unhandled exception in websocket listener, {e}")
 
     async def _listen_main(
         self,
@@ -123,14 +121,9 @@ class Client:
                     and msg["data"]["node"] is None
                     and msg["data"]["prompt_id"] == prompt_id
                 ):
-                    yield ClientMessage(
-                        ClientEvent.finished, prompt_id, 1, images
-                    )
+                    yield ClientMessage(ClientEvent.finished, prompt_id, 1, images)
 
-                if (
-                    msg["type"] == "executed"
-                    and msg["data"]["prompt_id"] == prompt_id
-                ):
+                if msg["type"] == "executed" and msg["data"]["prompt_id"] == prompt_id:
                     yield ClientMessage(
                         ClientEvent.finished, prompt_id, 1, images, result
                     )
@@ -144,10 +137,7 @@ class Client:
 
     async def _receive_images(self, prompt_id):
         async for msg in self._listen(prompt_id):
-            if (
-                msg.event is ClientEvent.finished
-                and msg.prompt_id == prompt_id
-            ):
+            if msg.event is ClientEvent.finished and msg.prompt_id == prompt_id:
                 assert msg.images is not None
                 return msg.images
             if msg.event is ClientEvent.error and msg.prompt_id == prompt_id:

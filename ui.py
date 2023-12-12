@@ -1,13 +1,12 @@
-import os
-from typing import Literal
 import functools
-import gradio as gr
+import os
 from multiprocessing import Queue
 
-from workflow_manager import GenerateSettings, WorkflowManager
-from status_manager import StatusManager
-from client import Client
+import gradio as gr
 
+from client import Client
+from status_manager import StatusManager
+from workflow_manager import GenerateSettings, WorkflowManager
 
 status_manager = StatusManager()
 workflow_list = os.listdir("workflows")
@@ -53,16 +52,17 @@ def ui(
     workflow_manager: WorkflowManager,
     generate_settings: GenerateSettings,
     client: Client,
-    queue: Queue,
-    is_capturing,
-    bbox,
+    shared_queue: Queue,
+    shared_is_capturing,
+    shared_bbox,
 ):
     def run_capture():
-        queue.put("set_bbox")
-        message = queue.get()
+        shared_queue.put("set_bbox")
+        message = shared_queue.get()
         assert message == "done"
+        assert shared_is_capturing.value == 1
         status_manager.is_capturing = True
-        status_manager.bbox = tuple(bbox)
+        status_manager.bbox = shared_bbox
         status_manager.run_capture()
 
     def stop_capture():
@@ -114,11 +114,7 @@ def ui(
             outputs=[control_strength],
         )
         ui.load(
-            fn=lambda: run_generate(
-                workflow_manager,
-                generate_settings,
-                client
-            ),
+            fn=lambda: run_generate(workflow_manager, generate_settings, client),
             inputs=[],
             outputs=image_output,
             every=0.01,

@@ -1,4 +1,6 @@
 import tkinter as tk
+from multiprocessing import Queue
+
 from pydantic import BaseModel
 
 
@@ -61,5 +63,13 @@ class CaptureBBoxManager:
         if self._root is not None:
             self._root.destroy()
             self._root = None
-    
 
+    def set_bbox(self, shared_queue: Queue, shared_is_captureing, shared_bbox):
+        # set shared objects between gradio process
+        self.run()
+        shared_is_captureing.value = 1
+        shared_bbox[0] = self._bbox.x1
+        shared_bbox[1] = self._bbox.y1
+        shared_bbox[2] = self._bbox.x2
+        shared_bbox[3] = self._bbox.y2
+        shared_queue.put("done")
